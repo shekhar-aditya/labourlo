@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LabourLo — Admin Panel</title>
+  <meta name="description" content="LabourLo admin dashboard to manage labour workforce, bookings, and analytics.">
+  <link rel="stylesheet" href="design-system.css">
+  <style>
+    /* Bento grid specific */
+    .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+    .form-grid    { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-grid .full { grid-column: 1 / -1; }
+    .panel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; }
+    /* Bento Main Dashboard Layout */
+    .bento-dashboard {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .bd-bookings  { grid-column: span 4; }
+    .bd-active    { grid-column: span 4; }
+    .bd-toptype   { grid-column: span 4; }
+    .bd-conflict  { grid-column: span 6; }
+    .bd-workers   { grid-column: span 6; }
+    @media(max-width:1100px) {
+      .bd-bookings,.bd-active,.bd-toptype { grid-column: span 6; }
+      .bd-conflict,.bd-workers { grid-column: span 12; }
+    }
+    @media(max-width:700px) {
+      .bd-bookings,.bd-active,.bd-toptype,.bd-conflict,.bd-workers { grid-column: span 12; }
+    }
+    .bento-stat-inner { height: 100%; display: flex; flex-direction: column; justify-content: space-between; }
+    .bento-stat-val {
+      font-family: var(--font-display); font-size: 48px; font-weight: 800;
+      line-height: 1; letter-spacing: -2px;
+      background: var(--grad-primary);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .bento-stat-lbl { font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--c-text-3); margin-top: 6px; }
+    .bento-stat-icon { font-size: 40px; filter: drop-shadow(0 4px 12px rgba(255,140,0,0.3)); }
+    .bento-tile-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .bento-tile-title { font-size: 13px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--c-text-3); }
+    /* Quick stat bars */
+    .bento-stat-bar { height: 4px; border-radius: 99px; background: rgba(255,255,255,0.07); margin-top: 10px; overflow: hidden; }
+    .bento-stat-bar-fill { height: 100%; border-radius: 99px; background: var(--grad-primary); width: 0; transition: width 1.2s ease; }
+    /* Worker mini row */
+    .worker-mini { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,140,0,0.07); }
+    .worker-mini:last-child { border-bottom: none; }
+    .worker-mini-av { width: 32px; height: 32px; border-radius: 50%; overflow: hidden; background: var(--orange-light); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; color: var(--orange); flex-shrink: 0; }
+    .worker-mini-av img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+    .worker-mini-name { font-size: 13px; font-weight: 600; color: var(--c-text); }
+    .worker-mini-cat  { font-size: 11px; color: var(--c-text-3); }
+    /* Conflict list */
+    .conflict-item { padding: 10px 12px; background: rgba(244,63,94,0.07); border: 1px solid rgba(244,63,94,0.18); border-radius: var(--r-sm); font-size: 12px; color: var(--rose); margin-bottom: 8px; }
+    @media(max-width:900px) {
+      .form-grid, .panel-grid, .metrics-grid { grid-template-columns: 1fr; }
+      .form-grid .full { grid-column: 1; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Preloader -->
+  <div id="ll-preloader">
+    <div class="preloader-worker">⚙️</div>
+    <div class="preloader-bar"><div class="preloader-fill"></div></div>
+    <div class="preloader-text">Loading Admin Console…</div>
+  </div>
+
+  <div class="ll-bg" aria-hidden="true"><div class="ll-bg-grid"></div></div>
+  <div class="ll-particles" aria-hidden="true">
+    <div class="ll-particle"></div><div class="ll-particle"></div><div class="ll-particle"></div>
+    <div class="ll-particle"></div><div class="ll-particle"></div><div class="ll-particle"></div>
+  </div>
+
+  <div class="ll-layout">
+    <!-- Sidebar -->
+    <aside class="ll-sidebar" id="sidebar" role="navigation" aria-label="Admin navigation">
+      <div class="ll-sidebar-logo" style="padding:16px 12px">
+        <img src="labourlo-logo.png" alt="LabourLo" style="width:160px;height:auto;object-fit:contain">
+      </div>
+      <nav class="ll-nav-section">
+        <div class="ll-nav-label">Overview</div>
+        <a class="ll-nav-link active" href="#section-dashboard" data-nav-link>
+          <span class="ll-nav-icon">📊</span> Dashboard
+        </a>
+        <button class="ll-nav-link" id="switch-to-customer-btn" type="button" style="text-align:left">
+          <span class="ll-nav-icon">👤</span> Customer View
+        </button>
+        <a class="ll-nav-link" href="labour-portal.html">
+          <span class="ll-nav-icon">👷</span> Labour Portal
+        </a>
+      </nav>
+      <nav class="ll-nav-section">
+        <div class="ll-nav-label">Management</div>
+        <a class="ll-nav-link" href="#section-profiles" data-nav-link>
+          <span class="ll-nav-icon">➕</span> Add Labour
+        </a>
+        <a class="ll-nav-link" href="#section-upload" data-nav-link>
+          <span class="ll-nav-icon">📤</span> Bulk Upload
+        </a>
+        <a class="ll-nav-link" href="#section-workers" data-nav-link>
+          <span class="ll-nav-icon">📋</span> All Workers
+        </a>
+        <a class="ll-nav-link" href="#section-stories" data-nav-link>
+          <span class="ll-nav-icon">📖</span> Manage Stories
+        </a>
+      </nav>
+      <div class="ll-sidebar-footer">
+        <button id="logout-btn" class="ll-btn ll-btn-danger" style="width:100%;justify-content:center;padding:11px">
+          🚪 Logout
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="ll-main">
+      <header class="ll-topbar">
+        <div>
+          <div class="ll-topbar-title">Admin Panel</div>
+          <div style="font-size:12px;color:var(--c-text-3);letter-spacing:.04em;text-transform:uppercase">Manage Your Labour Workforce</div>
+        </div>
+        <div class="ll-topbar-actions">
+          <div class="ll-avatar" id="topbar-avatar">A</div>
+        </div>
+      </header>
+
+      <div class="ll-content">
+
+        <!-- ── Bento Dashboard ── -->
+        <section id="section-dashboard" style="margin-bottom:36px">
+          <div class="ll-section-header">
+            <div>
+              <div class="ll-label" style="margin-bottom:4px">Overview</div>
+              <div class="ll-section-title">📊 Dashboard</div>
+            </div>
+          </div>
+
+          <div class="bento-dashboard">
+
+            <!-- Total Bookings -->
+            <div class="bento-tile bd-bookings anim-delay-1">
+              <div class="bento-tile-header">
+                <div class="bento-tile-title">Total Bookings</div>
+                <div class="bento-stat-icon">📋</div>
+              </div>
+              <div class="bento-stat-val" id="metric-total-bookings">0</div>
+              <div class="bento-stat-lbl">All time • across all workers</div>
+              <div class="bento-stat-bar"><div class="bento-stat-bar-fill" id="bar-bookings"></div></div>
+            </div>
+
+            <!-- Active Workers -->
+            <div class="bento-tile bd-active anim-delay-2">
+              <div class="bento-tile-header">
+                <div class="bento-tile-title">Active Workers</div>
+                <div class="bento-stat-icon">👷</div>
+              </div>
+              <div class="bento-stat-val" id="metric-active-workers">0</div>
+              <div class="bento-stat-lbl">Available right now</div>
+              <div class="bento-stat-bar"><div class="bento-stat-bar-fill" id="bar-workers" style="background:linear-gradient(135deg,#10b981,#00D4D0)"></div></div>
+            </div>
+
+            <!-- Most Requested -->
+            <div class="bento-tile bd-toptype anim-delay-3">
+              <div class="bento-tile-header">
+                <div class="bento-tile-title">Most Requested</div>
+                <div class="bento-stat-icon">🏆</div>
+              </div>
+              <div class="bento-stat-val" id="metric-top-type" style="font-size:26px;letter-spacing:-1px">N/A</div>
+              <div class="bento-stat-lbl">Top booked category</div>
+              <div style="margin-top:10px"><span class="ll-badge ll-badge-orange" id="top-type-count">0 bookings</span></div>
+            </div>
+
+            <!-- Conflict Resolver — span 6 -->
+            <div class="bento-tile bd-conflict anim-delay-4">
+              <div class="bento-tile-header">
+                <div class="bento-tile-title">⚠️ Conflict Resolver</div>
+                <span class="ll-badge ll-badge-rose" id="conflict-badge">0 conflicts</span>
+              </div>
+              <ul id="conflict-list" style="list-style:none;display:flex;flex-direction:column;gap:8px"></ul>
+              <div id="conflict-empty" class="conflict-empty">
+                <div style="font-size:32px;margin-bottom:6px">✅</div>
+                <div style="font-weight:600;color:var(--emerald)">No conflicts detected</div>
+              </div>
+            </div>
+
+            <!-- Quick Workers Preview — span 6 -->
+            <div class="bento-tile bd-workers anim-delay-5">
+              <div class="bento-tile-header">
+                <div class="bento-tile-title">👷 Top Workers</div>
+                <a href="#section-workers" class="ll-badge ll-badge-cyan" style="text-decoration:none;cursor:pointer">View All →</a>
+              </div>
+              <div id="bento-worker-preview"></div>
+            </div>
+
+            <!-- Pending Verification — full width -->
+            <div class="bento-tile col-span-12 anim-delay-6" id="bento-pending">
+              <div class="bento-tile-header">
+                <div class="bento-tile-title" data-i18n="pending_verify">⏳ Pending Verification</div>
+                <span class="ll-badge ll-badge-amber" id="pending-badge">0 pending</span>
+              </div>
+              <div id="pending-list"><div style="color:var(--c-text-3);font-size:13px">✓ No pending worker registrations</div></div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ── Labour Stories — Inspiring Worker Journeys ── -->
+        <section style="margin-bottom:36px;position:relative;overflow:visible" data-i18n-section="stories">
+          <div class="ll-section-header">
+            <div>
+              <div class="ll-label" style="margin-bottom:4px" data-i18n="stories_label">Inspiring Journeys</div>
+              <div class="ll-section-title" data-i18n="stories_title">💪 Labour Stories</div>
+            </div>
+          </div>
+
+          <!-- 3D floating decorations -->
+          <div class="ll-float-3d" style="top:-20px;right:40px;opacity:0.4"><div class="ll-geo-cube"></div></div>
+          <div class="ll-float-3d" style="bottom:10px;left:30px;opacity:0.3"><div class="ll-geo-sphere"></div></div>
+          <div class="ll-morph-blob" style="width:250px;height:250px;top:-40px;right:-60px;opacity:0.5"></div>
+
+          <div class="ll-img-showcase" id="admin-stories-grid">
+            <!-- Story 1 -->
+            <div class="ll-img-card ll-3d-enter">
+              <img src="https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=400&h=300&fit=crop" alt="Ramesh Kumar">
+              <div class="img-card-info">
+                <div class="img-card-title">Ramesh Kumar — Electrician</div>
+                <div class="img-card-sub">"From a small village to lighting up city buildings. Hard work never fails!" 💡</div>
+              </div>
+            </div>
+            <!-- Story 2 -->
+            <div class="ll-img-card ll-3d-enter">
+              <img src="https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=400&h=300&fit=crop" alt="Suresh Babu">
+              <div class="img-card-info">
+                <div class="img-card-title">Suresh Babu — Carpenter</div>
+                <div class="img-card-sub">"My father taught me woodwork. Now I build furniture for 50+ homes every year." 🪚</div>
+              </div>
+            </div>
+            <!-- Story 3 -->
+            <div class="ll-img-card ll-3d-enter">
+              <img src="https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=400&h=300&fit=crop" alt="Lakshmi Devi">
+              <div class="img-card-info">
+                <div class="img-card-title">Lakshmi Devi — Painter</div>
+                <div class="img-card-sub">"I started as a helper. Today I lead a team of 8 painters. Dreams do come true!" 🎨</div>
+              </div>
+            </div>
+            <!-- Story 4 -->
+            <div class="ll-img-card ll-3d-enter">
+              <img src="https://images.unsplash.com/photo-1590650153855-d9e808231d41?w=400&h=300&fit=crop" alt="Vijay Singh">
+              <div class="img-card-info">
+                <div class="img-card-title">Vijay Singh — Welder</div>
+                <div class="img-card-sub">"LabourLo gave me a platform to find steady work. I can now support my family." 🔥</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── 2-col grid: Form + Right ── -->
+        <div class="panel-grid">
+          <!-- Create Labour Profile -->
+          <div class="ll-glass-2" id="section-profiles" style="padding:22px">
+            <h2 class="ll-section-title" id="form-heading" style="margin-bottom:18px">➕ Create Labour Profile</h2>
+            <form id="add-labour-form" novalidate>
+              <div id="form-message" class="form-message-box"></div>
+              <div class="form-grid">
+                <div class="ll-form-group full">
+                  <label class="ll-form-label" for="labour-name">Full Name *</label>
+                  <input class="ll-input" id="labour-name" type="text" placeholder="e.g. Ramesh Kumar" required>
+                </div>
+                <div class="ll-form-group full">
+                  <label class="ll-form-label" for="labour-photo">Photo URL</label>
+                  <input class="ll-input" id="labour-photo" type="url" placeholder="https://example.com/photo.jpg">
+                </div>
+                <div class="ll-form-group">
+                  <label class="ll-form-label" for="labour-category">Skill Category *</label>
+                  <select class="ll-select" id="labour-category" required>
+                    <option value="Plumbing">Plumbing</option>
+                    <option value="Electrical">Electrical</option>
+                    <option value="Bricklaying">Bricklaying</option>
+                    <option value="Carpentry">Carpentry</option>
+                    <option value="Painting">Painting</option>
+                    <option value="General Labour">General Labour</option>
+                    <option value="Welding">Welding</option>
+                    <option value="Cleaning">Cleaning</option>
+                  </select>
+                </div>
+                <div class="ll-form-group">
+                  <label class="ll-form-label" for="labour-strength">Strength / Fitness</label>
+                  <select class="ll-select" id="labour-strength">
+                    <option value="Low">Low</option>
+                    <option value="Medium" selected>Medium</option>
+                    <option value="High">High</option>
+                    <option value="Very High">Very High</option>
+                  </select>
+                </div>
+                <div class="ll-form-group">
+                  <label class="ll-form-label" for="labour-daily-rate">Daily Rate (₹)</label>
+                  <input class="ll-input" id="labour-daily-rate" type="number" min="0" placeholder="500">
+                </div>
+                <div class="ll-form-group">
+                  <label class="ll-form-label" for="labour-hourly-rate">Hourly Rate (₹) *</label>
+                  <input class="ll-input" id="labour-hourly-rate" type="number" min="0" placeholder="80" required>
+                </div>
+                <div class="ll-form-group">
+                  <label class="ll-form-label" for="labour-rating">Rating Override (0–5)</label>
+                  <input class="ll-input" id="labour-rating" type="number" min="0" max="5" step="0.1" value="4.0">
+                </div>
+                <div class="ll-form-group">
+                  <label class="ll-form-label" for="labour-skills">Skills (comma separated)</label>
+                  <input class="ll-input" id="labour-skills" type="text" placeholder="Masonry, Pipe Repair">
+                </div>
+                <div class="ll-form-group full" style="display:flex;flex-direction:column;gap:8px">
+                  <div class="checkbox-row">
+                    <input type="checkbox" id="labour-available" checked>
+                    <label for="labour-available">✅ Mark as Available</label>
+                  </div>
+                  <div class="checkbox-row">
+                    <input type="checkbox" id="labour-verified" checked>
+                    <label for="labour-verified">🛡️ Verified Badge</label>
+                  </div>
+                  <div class="checkbox-row">
+                    <input type="checkbox" id="labour-rating-verified" checked>
+                    <label for="labour-rating-verified">📋 Rating Verified by Background Check</label>
+                  </div>
+                </div>
+                <div class="full" style="display:flex;gap:10px">
+                  <button type="submit" id="labour-submit-btn" class="ll-btn ll-btn-primary btn-magnetic" style="flex:1;padding:13px">
+                    ➕ Add Labour Profile
+                  </button>
+                  <button type="button" id="labour-cancel-btn" class="ll-btn ll-btn-ghost" style="display:none">
+                    ✕ Cancel
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <!-- Right column -->
+          <div style="display:flex;flex-direction:column;gap:20px">
+            <!-- Bulk Upload -->
+            <div class="ll-glass-2" id="section-upload" style="padding:22px">
+              <h2 class="ll-section-title" style="margin-bottom:14px">📤 Bulk Upload (CSV)</h2>
+              <div style="font-size:12px;color:var(--c-text-2);margin-bottom:14px;font-family:monospace;background:rgba(255,140,0,0.05);padding:10px;border-radius:var(--r-sm);line-height:1.7;border:1px solid rgba(255,140,0,0.12)">
+                Required headers: <strong>name</strong>, photoUrl, <strong>category</strong>, dailyRate, <strong>hourlyRate</strong>, strength, rating, ratingVerified, verified, isAvailable, skills
+              </div>
+              <label class="upload-zone" for="csv-input">
+                <div class="upload-zone-icon">🗂️</div>
+                <div style="font-weight:600;color:var(--c-text-2);margin-bottom:6px">Click or drag CSV file here</div>
+                <div style="font-size:12px;color:var(--c-text-3)">Only .csv files — max 10MB</div>
+              </label>
+              <input type="file" id="csv-input" accept=".csv" style="display:none">
+              <button id="upload-csv-btn" class="ll-btn ll-btn-success" style="width:100%;margin-top:12px;padding:12px">
+                📤 Upload CSV
+              </button>
+              <div id="csv-message" class="form-message-box" style="margin-top:10px"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── All Workers ── -->
+        <section id="section-workers">
+          <div class="ll-section-header">
+            <div>
+              <div class="ll-label" style="margin-bottom:4px">Registered Workers</div>
+              <div class="ll-section-title">👷 Labour Management</div>
+            </div>
+            <span class="ll-badge ll-badge-cyan" id="worker-count-badge">0 Workers</span>
+          </div>
+          <div class="ll-glass-2" style="padding:20px">
+            <div id="labour-admin-list"></div>
+          </div>
+        </section>
+
+        <!-- ── Stories Management ── -->
+        <section id="section-stories" style="margin-bottom:36px">
+          <div class="ll-section-header">
+            <div>
+              <div class="ll-label" style="margin-bottom:4px">Content Management</div>
+              <div class="ll-section-title">📖 Manage Stories</div>
+              <div style="font-size:13px;color:var(--c-text-2);margin-top:2px">Add or edit inspiring labour stories shown in Customer &amp; Worker portals</div>
+            </div>
+            <span class="ll-badge ll-badge-orange" id="stories-count-badge">0 Stories</span>
+          </div>
+
+          <!-- Story Form -->
+          <div class="ll-glass-2" style="padding:24px;margin-bottom:24px">
+            <h3 class="ll-section-title" id="story-form-heading" style="margin-bottom:18px;font-size:17px">➕ Add New Story</h3>
+            <div class="form-grid">
+
+              <div class="ll-form-group">
+                <label class="ll-form-label" for="story-name">Worker Name *</label>
+                <input class="ll-input" id="story-name" type="text" placeholder="e.g. Ramesh Kumar">
+              </div>
+              <div class="ll-form-group">
+                <label class="ll-form-label" for="story-role">Role / Skill *</label>
+                <input class="ll-input" id="story-role" type="text" placeholder="e.g. Electrician">
+              </div>
+              <div class="ll-form-group full">
+                <label class="ll-form-label" for="story-image-upload">Labour Photo</label>
+                <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
+                  <label for="story-image-upload" id="story-upload-zone"
+                    style="cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;width:160px;height:160px;border-radius:var(--r-lg);border:2.5px dashed rgba(255,140,0,0.35);background:var(--orange-light);flex-shrink:0;transition:border-color 0.2s,background 0.2s;text-align:center;padding:12px;gap:6px"
+                    onmouseover="this.style.borderColor='var(--orange)';this.style.background='rgba(255,140,0,0.12)'"
+                    onmouseout="this.style.borderColor='rgba(255,140,0,0.35)';this.style.background='var(--orange-light)'">
+                    <span id="story-img-preview-wrap" style="width:100%;flex:1;display:flex;align-items:center;justify-content:center;border-radius:var(--r-md);overflow:hidden">
+                      <span id="story-img-placeholder" style="font-size:36px;line-height:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                        &#x1F4F7;
+                        <span style="font-size:10px;font-weight:600;color:var(--c-text-2);letter-spacing:0.04em">CLICK OR DRAG</span>
+                      </span>
+                      <img id="story-img-preview" src="" alt="Preview" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:var(--r-md)">
+                    </span>
+                    <input type="file" id="story-image-upload" accept="image/*" style="display:none">
+                  </label>
+                  <div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:8px">
+                    <div style="font-size:13px;color:var(--c-text-2);line-height:1.5">Upload a photo (JPG/PNG/WEBP, max 5MB) <strong>or</strong> drag-and-drop onto the box. You can also paste an image URL below.</div>
+                    <div class="form-message-box" id="story-form-msg"></div>
+                    <label class="ll-form-label" for="story-image-url" style="margin-top:4px">Or paste image URL</label>
+                    <input class="ll-input" id="story-image-url" type="url" placeholder="https://example.com/photo.jpg" style="font-size:12px">
+                  </div>
+                </div>
+              </div>
+
+              <div class="ll-form-group full">
+                <label class="ll-form-label" for="story-text">Inspiring Story *</label>
+                <textarea class="ll-input" id="story-text" placeholder="Write the worker's inspiring journey here…" rows="4" style="resize:vertical;min-height:90px"></textarea>
+              </div>
+              <div class="full" style="display:flex;gap:10px">
+                <button id="story-submit-btn" class="ll-btn ll-btn-primary btn-magnetic" style="flex:1;padding:12px">➕ Add Story</button>
+                <button id="story-cancel-btn" class="ll-btn ll-btn-ghost" style="display:none">✕ Cancel</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stories Grid -->
+          <div class="ll-glass-2" style="padding:20px">
+            <div id="stories-admin-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px"></div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="app-state.js"></script>
+  <script src="rbac.js"></script>
+  <script src="admin.js"></script>
+  <script src="translations.js"></script>
+  <script src="enhancements.js"></script>
+  <script>
+    // Bento stat bars + worker preview after admin.js populates data
+    document.addEventListener('DOMContentLoaded', function () {
+      setTimeout(function () {
+        // Animate stat bars
+        var analytics = window.AppState && window.AppState.getAnalytics();
+        if (analytics) {
+          var maxB = Math.max(analytics.totalBookings, 1);
+          var maxW = Math.max(AppState.getLabours().length, 1);
+          var bf = document.getElementById('bar-bookings');
+          var wf = document.getElementById('bar-workers');
+          if (bf) bf.style.width = Math.min(100, (analytics.totalBookings / maxB) * 100) + '%';
+          if (wf) wf.style.width = Math.min(100, (analytics.activeWorkers / maxW) * 100) + '%';
+          var tc = document.getElementById('top-type-count');
+          if (tc) tc.textContent = analytics.mostRequestedCount + ' bookings';
+          var cb = document.getElementById('conflict-badge');
+          var conflicts = AppState.getBookingConflicts();
+          if (cb) cb.textContent = conflicts.length + ' conflicts';
+        }
+
+        // Bento worker preview (top 4)
+        var preview = document.getElementById('bento-worker-preview');
+        if (preview) {
+          var workers = (window.AppState && window.AppState.getLabours()) || [];
+          preview.innerHTML = workers.slice(0,4).map(function(w) {
+            var initials = w.name.split(' ').map(function(n){return n[0]}).join('');
+            var imgHtml = w.photoUrl
+              ? '<img src="'+w.photoUrl+'" alt="'+w.name+'">'
+              : initials;
+            return '<div class="worker-mini">'
+              + '<div class="worker-mini-av">'+imgHtml+'</div>'
+              + '<div><div class="worker-mini-name">'+w.name+'</div>'
+              + '<div class="worker-mini-cat">'+w.category+' · ₹'+w.hourlyRate+'/hr</div></div>'
+              + '<span style="margin-left:auto" class="ll-badge '+(w.isAvailable?'ll-badge-emerald':'ll-badge-muted')+'">'+(w.isAvailable?'Active':'Off')+'</span>'
+              + '</div>';
+          }).join('');
+        }
+
+        // Pending workers
+        function renderPending() {
+          var pending = (window.AppState && window.AppState.getPendingWorkers()) || [];
+          var active = pending.filter(function(p){ return p.status === 'pending'; });
+          var badge = document.getElementById('pending-badge');
+          var list  = document.getElementById('pending-list');
+          if (badge) badge.textContent = active.length + ' pending';
+          if (!list) return;
+          if (!active.length) {
+            list.innerHTML = '<div style="color:var(--c-text-3);font-size:13px">✓ No pending worker registrations</div>';
+            return;
+          }
+          list.innerHTML = active.map(function(p) {
+            var catIcon = {Plumbing:'🪠',Electrical:'⚡',Bricklaying:'🧱',Carpentry:'🪚',Painting:'🎨','General Labour':'🏗️',Welding:'🔥',Cleaning:'🧹'}[p.category] || '👷';
+            var maskedAadhar = p.aadhar ? p.aadhar.slice(0,-4).replace(/\d/g,'*') + p.aadhar.slice(-4) : 'N/A';
+            return '<div class="labour-admin-card" style="margin-bottom:10px">'
+              + '<div class="lcard-avatar">'+catIcon+'</div>'
+              + '<div class="lcard-info">'
+              + '<div class="lcard-name">'+p.name+' <span class="ll-badge ll-badge-amber" style="font-size:10px">⏳ Pending</span></div>'
+              + '<div class="lcard-meta">'+p.category+' · ₹'+p.hourlyRate+'/hr · Aadhar: '+maskedAadhar+'</div>'
+              + '<div style="font-size:11px;color:var(--c-text-3);margin-top:3px">Submitted: '+new Date(p.submittedAt).toLocaleDateString('en-IN')+'</div>'
+              + '</div>'
+              + '<div class="lcard-actions" style="flex-direction:row;gap:8px">'
+              + '<button onclick="adminApprove(\''+p.id+'\')" class="ll-btn ll-btn-success" style="padding:7px 14px;font-size:12px">✅ Approve</button>'
+              + '<button onclick="adminReject(\''+p.id+'\')" class="ll-btn ll-btn-danger" style="padding:7px 14px;font-size:12px">❌ Reject</button>'
+              + '</div></div>';
+          }).join('');
+        }
+
+        window.adminApprove = function(id) {
+          var r = window.AppState.approvePendingWorker(id);
+          if (r.ok) { alert('✅ Worker approved and added to registry!'); renderPending(); if(typeof refreshAll === 'function') refreshAll(); }
+          else { alert('❌ ' + r.error); }
+        };
+        window.adminReject = function(id) {
+          if (confirm('Reject this worker application?')) {
+            window.AppState.rejectPendingWorker(id);
+            renderPending();
+          }
+        };
+
+        renderPending();
+      }, 300);
+    });
+
+    // ── Stories Management (Bulletproof) ──
+    (function() {
+      // Single shared state — never lose the image between steps
+      var storyState = { editingId: null, base64: '', urlVal: '' };
+
+      // ── helpers ──
+      function el(id) { return document.getElementById(id); }
+
+      function showMsg(msg, type) {
+        var box = el('story-form-msg');
+        if (!box) return;
+        box.className = 'form-message-box' + (type ? ' ' + type : '');
+        box.textContent = msg;
+        if (msg) setTimeout(function() { box.textContent = ''; box.className = 'form-message-box'; }, 3500);
+      }
+
+      function setPreview(src) {
+        var prev = el('story-img-preview');
+        var ph   = el('story-img-placeholder');
+        if (!prev) return;
+        if (src) {
+          prev.src = src;
+          prev.style.display = 'block';
+          if (ph) ph.style.display = 'none';
+        } else {
+          prev.src = '';
+          prev.style.display = 'none';
+          if (ph) ph.style.display = 'inline';
+        }
+      }
+
+      function getImageUrl() {
+        // Priority: uploaded base64 > URL field
+        return storyState.base64 || (el('story-image-url') ? el('story-image-url').value.trim() : '');
+      }
+
+      // ── render grid ──
+      function renderGrid() {
+        var stories = (window.AppState && window.AppState.getStories()) || [];
+        var badge = el('stories-count-badge');
+        var grid  = el('stories-admin-grid');
+        if (badge) badge.textContent = stories.length + ' Stories';
+        if (!grid) return;
+        if (!stories.length) {
+          grid.innerHTML = '<div class="ll-empty" style="grid-column:1/-1;padding:40px 20px">'
+            + '<div class="ll-empty-icon">&#x1F4D6;</div>'
+            + '<div class="ll-empty-text">No stories yet. Add the first one above!</div></div>';
+          return;
+        }
+        grid.innerHTML = stories.map(function(s) {
+          var safe = function(t) { return String(t || '').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+          var imgBlock = s.imageUrl
+            ? '<img src="' + s.imageUrl + '" alt="' + safe(s.name) + '" loading="lazy"'
+              + ' style="width:100%;height:170px;object-fit:cover;display:block"'
+              + ' onerror="this.style.display=\'none\'">'
+            : '<div style="width:100%;height:170px;background:var(--orange-light);display:flex;align-items:center;justify-content:center;font-size:44px">&#x1F477;</div>';
+          return '<div style="border-radius:var(--r-md);overflow:hidden;background:#fff;border:1.5px solid rgba(0,0,0,0.07);box-shadow:var(--shadow-sm);transition:box-shadow 0.2s,transform 0.2s" onmouseover="this.style.boxShadow=\'var(--shadow-md)\';this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.boxShadow=\'var(--shadow-sm)\';this.style.transform=\'\'">'
+            + imgBlock
+            + '<div style="padding:14px 16px">'
+            + '<div style="font-size:14px;font-weight:700;color:var(--c-text);margin-bottom:2px">' + safe(s.name) + '</div>'
+            + '<div style="font-size:11px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">' + safe(s.role) + '</div>'
+            + '<div style="font-size:12px;color:var(--c-text-2);line-height:1.5;margin-bottom:12px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">' + safe(s.storyText) + '</div>'
+            + '<div style="display:flex;gap:8px">'
+            + '<button onclick="editStory(\'' + s.id + '\')" class="ll-btn ll-btn-ghost" style="flex:1;padding:8px;font-size:12px">&#x270F;&#xFE0F; Edit</button>'
+            + '<button onclick="deleteStoryConfirm(\'' + s.id + '\')" class="ll-btn ll-btn-danger" style="padding:8px 14px;font-size:12px">&#x1F5D1;&#xFE0F;</button>'
+            + '</div></div></div>';
+        }).join('');
+      }
+
+      // ── reset form ──
+      function resetForm() {
+        storyState.editingId = null;
+        storyState.base64    = '';
+        storyState.urlVal    = '';
+        ['story-name','story-role','story-text','story-image-url'].forEach(function(id) {
+          if (el(id)) el(id).value = '';
+        });
+        // reset file input
+        var fileInput = el('story-image-upload');
+        if (fileInput) fileInput.value = '';
+        setPreview('');
+        if (el('story-form-heading')) el('story-form-heading').textContent = '+ Add New Story';
+        if (el('story-submit-btn'))   el('story-submit-btn').textContent   = '+ Add Story';
+        if (el('story-cancel-btn'))   el('story-cancel-btn').style.display = 'none';
+        showMsg('', '');
+      }
+
+      // ── public: editStory ──
+      window.editStory = function(id) {
+        var s = ((window.AppState && window.AppState.getStories()) || []).find(function(x){ return x.id === id; });
+        if (!s) return;
+        resetForm();
+        storyState.editingId = id;
+        storyState.base64    = (s.imageUrl && s.imageUrl.startsWith('data:')) ? s.imageUrl : '';
+        storyState.urlVal    = (s.imageUrl && !s.imageUrl.startsWith('data:')) ? s.imageUrl : '';
+        if (el('story-name'))      el('story-name').value      = s.name      || '';
+        if (el('story-role'))      el('story-role').value      = s.role      || '';
+        if (el('story-text'))      el('story-text').value      = s.storyText || '';
+        if (el('story-image-url')) el('story-image-url').value = storyState.urlVal;
+        setPreview(s.imageUrl || '');
+        if (el('story-form-heading')) el('story-form-heading').textContent = 'Edit Story';
+        if (el('story-submit-btn'))   el('story-submit-btn').textContent   = 'Save Changes';
+        if (el('story-cancel-btn'))   el('story-cancel-btn').style.display = 'inline-flex';
+        var section = el('section-stories');
+        if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+
+      // ── public: deleteStoryConfirm ──
+      window.deleteStoryConfirm = function(id) {
+        if (!confirm('Delete this story? This cannot be undone.')) return;
+        if (window.AppState) window.AppState.deleteStory(id);
+        renderGrid();
+        showMsg('Story deleted.', 'success');
+      };
+
+      // ── File upload (bulletproof FileReader) ──
+      var uploadLabel = el('story-image-upload') && el('story-image-upload').closest ? el('story-image-upload').closest('label') : null;
+      var uploadInput = el('story-image-upload');
+
+      function loadFile(file) {
+        if (!file || !file.type.startsWith('image/')) {
+          showMsg('Please select a valid image file (JPG, PNG, WEBP, etc.)', 'error');
+          return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          showMsg('Image must be under 5MB. Please compress or use a URL instead.', 'error');
+          return;
+        }
+        var reader = new FileReader();
+        reader.onloadstart = function() { setPreview(''); showMsg('Reading image...', ''); };
+        reader.onerror = function() { showMsg('Failed to read image file. Try a URL instead.', 'error'); };
+        reader.onload = function(ev) {
+          storyState.base64 = ev.target.result;
+          storyState.urlVal = '';                    // clear URL when file is chosen
+          if (el('story-image-url')) el('story-image-url').value = '';
+          setPreview(storyState.base64);
+          showMsg('Image loaded! Hit "Add Story" to save.', 'success');
+        };
+        reader.readAsDataURL(file);
+      }
+
+      if (uploadInput) {
+        uploadInput.addEventListener('change', function(e) {
+          if (e.target.files && e.target.files[0]) loadFile(e.target.files[0]);
+        });
+      }
+
+      // Drag & drop on upload zone label
+      var uploadZone = uploadLabel || (uploadInput ? uploadInput.parentElement : null);
+      if (uploadZone) {
+        uploadZone.addEventListener('dragover', function(e) { e.preventDefault(); uploadZone.style.borderColor = 'var(--orange)'; });
+        uploadZone.addEventListener('dragleave', function()  { uploadZone.style.borderColor = ''; });
+        uploadZone.addEventListener('drop', function(e) {
+          e.preventDefault();
+          uploadZone.style.borderColor = '';
+          var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+          if (file) loadFile(file);
+        });
+      }
+
+      // URL field: live preview, clears base64
+      if (el('story-image-url')) {
+        el('story-image-url').addEventListener('input', function() {
+          var val = this.value.trim();
+          storyState.urlVal = val;
+          if (val) {
+            storyState.base64 = '';
+            if (uploadInput) uploadInput.value = '';
+            setPreview(val);
+          } else if (!storyState.base64) {
+            setPreview('');
+          }
+        });
+      }
+
+      // ── Submit ──
+      if (el('story-submit-btn')) {
+        el('story-submit-btn').addEventListener('click', function() {
+          var name = el('story-name') ? el('story-name').value.trim() : '';
+          var role = el('story-role') ? el('story-role').value.trim() : '';
+          var text = el('story-text') ? el('story-text').value.trim() : '';
+          var imageUrl = getImageUrl();
+
+          if (!name) { showMsg('Worker name is required.', 'error'); el('story-name').focus(); return; }
+          if (!text) { showMsg('Story text is required.', 'error'); el('story-text').focus(); return; }
+
+          var btn = this;
+          btn.disabled = true;
+          btn.textContent = 'Saving...';
+
+          try {
+            var payload = { name: name, role: role, imageUrl: imageUrl, storyText: text };
+            var result = storyState.editingId
+              ? window.AppState.updateStory(storyState.editingId, payload)
+              : window.AppState.addStory(payload);
+
+            if (result && result.ok) {
+              showMsg(storyState.editingId ? 'Story updated and visible in portals!' : 'Story saved! Customers can now see it.', 'success');
+              resetForm();
+              renderGrid();
+            } else {
+              showMsg('Error: ' + (result ? result.error : 'Unknown error'), 'error');
+            }
+          } catch(err) {
+            showMsg('Save failed: ' + err.message, 'error');
+          } finally {
+            btn.disabled = false;
+            btn.textContent = storyState.editingId ? 'Save Changes' : '+ Add Story';
+          }
+        });
+      }
+
+      if (el('story-cancel-btn')) {
+        el('story-cancel-btn').addEventListener('click', resetForm);
+      }
+
+      // ── Init ──
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() { setTimeout(renderGrid, 300); });
+      } else {
+        setTimeout(renderGrid, 300);
+      }
+    })();
+
+
+  </script>
+</body>
+</html>
+

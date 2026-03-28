@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LabourLo — Customer Portal</title>
+  <meta name="description" content="Book skilled workers instantly with LabourLo customer dashboard.">
+  <link rel="stylesheet" href="design-system.css">
+  <!-- Leaflet.js -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <!-- VanillaTilt -->
+  <script src="https://cdn.jsdelivr.net/npm/vanilla-tilt@1.8.0/dist/vanilla-tilt.min.js" defer></script>
+  <!-- GSAP + ScrollTrigger -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" defer></script>
+  <!-- Leaflet (after GSAP so it's available) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+  <style>
+    .welcome-banner {
+      position: relative; overflow: hidden;
+      padding: 24px 28px; border-radius: var(--r-xl);
+      background: linear-gradient(135deg, rgba(255,140,0,0.08) 0%, rgba(0,212,208,0.06) 100%);
+      border: 1.5px solid rgba(255,140,0,0.18); margin-bottom: 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      animation: neon-pulse 4s ease-in-out infinite;
+    }
+    .welcome-banner::after { content:''; position:absolute; top:-30px; right:-30px; width:120px; height:120px; border-radius:50%; background:radial-gradient(circle,rgba(255,140,0,0.12),transparent 70%); }
+    .stat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-bottom: 28px; }
+    .worker-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; }
+    .search-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+    .search-bar .ll-input { flex: 1; }
+    table { width: 100%; }
+    .bookings-table-wrap { overflow-x: auto; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 5px; animation: pulse-dot 2s infinite; }
+    .status-dot.online { background: var(--emerald); }
+    .admin-return-btn { display: none; }
+    /* Map section */
+    #section-track { position: relative; }
+    .map-wrapper { position: relative; border-radius: var(--r-lg); overflow: hidden; }
+    @media(max-width:900px) { .worker-grid, .stat-grid { grid-template-columns: 1fr 1fr; } }
+    @media(max-width:600px) { .worker-grid { grid-template-columns: 1fr; } .stat-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <!-- Preloader -->
+  <div id="ll-preloader">
+    <div class="preloader-worker">🔍</div>
+    <div class="preloader-bar"><div class="preloader-fill"></div></div>
+    <div class="preloader-text">Finding workers near you…</div>
+  </div>
+
+  <div class="ll-bg" aria-hidden="true"><div class="ll-bg-grid"></div></div>
+  <div class="ll-particles" aria-hidden="true">
+    <div class="ll-particle"></div><div class="ll-particle"></div><div class="ll-particle"></div>
+    <div class="ll-particle"></div><div class="ll-particle"></div><div class="ll-particle"></div>
+    <div class="ll-particle"></div><div class="ll-particle"></div><div class="ll-particle"></div>
+    <div class="ll-particle"></div><div class="ll-particle"></div><div class="ll-particle"></div>
+  </div>
+
+  <div class="ll-layout">
+    <!-- Sidebar -->
+    <aside class="ll-sidebar" id="sidebar" role="navigation" aria-label="Customer navigation">
+      <div class="ll-sidebar-logo" style="padding:16px 12px">
+        <img src="labourlo-logo.png" alt="LabourLo" style="width:160px;height:auto;object-fit:contain">
+      </div>
+      <nav class="ll-nav-section">
+        <div class="ll-nav-label">Main</div>
+        <a class="ll-nav-link" href="#dashboard" data-nav-link>
+          <span class="ll-nav-icon">🏠</span> Dashboard
+        </a>
+        <a class="ll-nav-link" href="#find-workers" data-nav-link>
+          <span class="ll-nav-icon">🔍</span> Find Workers
+        </a>
+        <a class="ll-nav-link" href="#section-track" data-nav-link>
+          <span class="ll-nav-icon">🗺️</span> Track Worker
+        </a>
+        <a class="ll-nav-link" href="#my-bookings" data-nav-link>
+          <span class="ll-nav-icon">📋</span> My Bookings
+          <span class="ll-badge ll-badge-orange" id="notif-count" style="margin-left:auto;padding:2px 8px">0</span>
+        </a>
+      </nav>
+      <nav class="ll-nav-section">
+        <div class="ll-nav-label">Account</div>
+        <a class="ll-nav-link" href="#profile" data-nav-link>
+          <span class="ll-nav-icon">👤</span> Profile
+        </a>
+        <a class="ll-nav-link" href="labour-portal.html">
+          <span class="ll-nav-icon">👷</span> Labour Portal
+        </a>
+        <a class="ll-nav-link" href="#payments" data-nav-link>
+          <span class="ll-nav-icon">💳</span> Payments
+        </a>
+      </nav>
+      <div class="ll-sidebar-footer">
+        <button id="admin-return-btn" class="ll-btn ll-btn-violet admin-return-btn" style="width:100%;justify-content:center;margin-bottom:10px;display:none">
+          🛡️ Go to Admin Panel
+        </button>
+        <button id="logout-btn" class="ll-btn ll-btn-danger" style="width:100%;justify-content:center">
+          🚪 Logout
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="ll-main">
+      <header class="ll-topbar">
+        <div>
+          <div class="ll-topbar-title">Customer Portal</div>
+          <div style="font-size:12px;color:var(--c-text-3);letter-spacing:.04em;text-transform:uppercase">Book Skilled Workers Instantly</div>
+        </div>
+        <div class="ll-topbar-actions">
+          <button class="ll-btn ll-btn-ghost" style="padding:9px 14px;font-size:13px" title="Notifications">
+            🔔 <span class="ll-badge ll-badge-rose" id="notif-count-2" style="padding:1px 6px;font-size:10px">0</span>
+          </button>
+          <div class="ll-avatar" id="topbar-avatar">C</div>
+        </div>
+      </header>
+
+      <div class="ll-content">
+
+        <!-- Dashboard -->
+        <section id="dashboard" style="margin-bottom:0">
+          <div class="welcome-banner anim-fade-in">
+            <div>
+              <div class="ll-label" style="color:var(--orange);margin-bottom:6px">👋 WELCOME BACK</div>
+              <div style="font-family:var(--font-display);font-size:28px;font-weight:800;color:var(--c-text);letter-spacing:-1px" id="welcome-name">Loading…</div>
+              <div style="font-size:14px;color:var(--c-text-2);margin-top:4px">Find the perfect worker for your job today</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0">
+              <span class="ll-badge ll-badge-emerald" style="padding:7px 14px;font-size:12px">
+                <span class="dot"></span> Online
+              </span>
+            </div>
+          </div>
+
+          <!-- Stat cards -->
+          <div class="stat-grid">
+            <div class="ll-stat-card ll-card-3d anim-pop-scale anim-delay-1">
+              <div class="stat-glow"></div>
+              <div class="stat-icon">📋</div>
+              <div class="stat-value" id="stat-bookings">0</div>
+              <div class="stat-label">My Bookings</div>
+            </div>
+            <div class="ll-stat-card ll-card-3d anim-pop-scale anim-delay-2">
+              <div class="stat-glow" style="background:var(--emerald)"></div>
+              <div class="stat-icon" style="background:var(--emerald-light);border-color:rgba(16,185,129,0.2)">✅</div>
+              <div class="stat-value" id="stat-completed">0</div>
+              <div class="stat-label">Completed</div>
+            </div>
+            <div class="ll-stat-card ll-card-3d anim-pop-scale anim-delay-3">
+              <div class="stat-glow" style="background:var(--amber)"></div>
+              <div class="stat-icon" style="background:var(--amber-light);border-color:rgba(245,158,11,0.2)">💰</div>
+              <div class="stat-value" id="stat-spent">₹0</div>
+              <div class="stat-label">Total Spent</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Labour Stories ── -->
+        <section style="margin-bottom:24px;position:relative;overflow:visible">
+          <div class="ll-section-header">
+            <div>
+              <div class="ll-label" style="margin-bottom:4px" data-i18n="stories_label">Inspiring Journeys</div>
+              <div class="ll-section-title" data-i18n="stories_title">💪 Labour Stories</div>
+            </div>
+          </div>
+
+          <div class="ll-float-3d" style="top:-15px;right:50px;opacity:0.35"><div class="ll-geo-sphere"></div></div>
+          <div class="ll-morph-blob" style="width:200px;height:200px;bottom:-30px;left:-40px;opacity:0.4"></div>
+
+          <div class="ll-img-showcase" id="stories-showcase">
+            <div class="ll-empty" style="grid-column:1/-1;padding:40px"><div class="ll-empty-icon">&#x1F4AA;</div><div class="ll-empty-text">Loading stories...</div></div>
+          </div>
+        </section>
+
+        <!-- Authentic banner with scroll animation -->
+        <section id="authentic-banner" style="margin-bottom:24px;border-radius:var(--r-xl);overflow:hidden;border:1.5px solid rgba(255,140,0,0.15);box-shadow:var(--shadow-md)">
+          <div style="display:flex;align-items:stretch;min-height:200px;position:relative">
+            <!-- Text left side -->
+            <div style="flex:1;padding:36px 40px;background:linear-gradient(135deg,rgba(255,140,0,0.07),rgba(0,212,208,0.05));display:flex;flex-direction:column;justify-content:center;position:relative;z-index:1">
+              <div style="font-size:11px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--orange);margin-bottom:10px">&#x2728; Verified Platform</div>
+              <div style="font-size:30px;font-weight:800;color:var(--c-text);font-family:var(--font-display);letter-spacing:-1px;margin-bottom:10px;line-height:1.2">100% Authentic<br>Workforce</div>
+              <div style="font-size:14px;color:var(--c-text-2);line-height:1.6;max-width:340px">Every worker on LabourLo is background-checked, ID-verified and rated by real customers. Hire with complete confidence.</div>
+              <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap">
+                <span class="ll-badge ll-badge-emerald" style="padding:8px 14px;font-size:12px">&#x2705; ID Verified</span>
+                <span class="ll-badge ll-badge-orange" style="padding:8px 14px;font-size:12px">&#x2B50; Background Checked</span>
+                <span class="ll-badge ll-badge-cyan" style="padding:8px 14px;font-size:12px">&#x1F6E1;&#xFE0F; Insured Work</span>
+              </div>
+            </div>
+            <!-- Image right side — fills full rectangle -->
+            <div style="position:relative;width:42%;flex-shrink:0;overflow:hidden;min-height:200px">
+              <img id="authentic-img" src="authentic.png" alt="Authentic LabourLo"
+                style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;display:block;transform:translateX(100%);transition:transform 1s cubic-bezier(0.22,1,0.36,1)">
+              <!-- subtle left-edge fade -->
+              <div style="position:absolute;inset:0;background:linear-gradient(to right,rgba(245,247,251,0.35) 0%,transparent 35%);z-index:1;pointer-events:none"></div>
+            </div>
+          </div>
+        </section>
+
+
+
+
+        <!-- Find Workers -->
+        <section id="find-workers" class="section-card">
+          <div class="ll-section-header">
+            <div>
+              <div class="ll-label" style="margin-bottom:4px">Available Professionals</div>
+              <div class="ll-section-title">🔍 Find Workers</div>
+              <div style="font-size:13px;color:var(--c-text-2);margin-top:2px">Browse verified, skilled professionals</div>
+            </div>
+          </div>
+          <div class="search-bar">
+            <div style="position:relative;flex:1">
+              <span style="position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:15px;pointer-events:none">🔍</span>
+              <input class="ll-input" type="search" id="search-input" placeholder="Search by name or skill…" style="padding-left:40px">
+            </div>
+            <select class="ll-select" id="filter-sort" style="width:180px;">
+              <option value="nearest">📍 Nearest to Me</option>
+              <option value="top-rated">⭐ Top Rated</option>
+              <option value="price-low">💰 Price: Low to High</option>
+            </select>
+          </div>
+          <div class="worker-grid" id="labour-grid">
+            <div class="ll-empty" style="grid-column:1/-1">
+              <div class="ll-empty-icon">👷</div>
+              <div class="ll-empty-text">Loading workers…</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Track Worker Map -->
+        <section id="section-track" class="section-card">
+          <div class="ll-section-header">
+            <div>
+              <div class="ll-label" style="margin-bottom:4px">Live Location</div>
+              <div class="ll-section-title">🗺️ Track Worker</div>
+              <div style="font-size:13px;color:var(--c-text-2);margin-top:2px">Real-time worker proximity visualization</div>
+            </div>
+            <span class="ll-badge ll-badge-emerald"><span class="dot"></span> Live</span>
+          </div>
+          <div class="map-wrapper">
+            <div id="track-worker-map"></div>
+            <div class="map-distance-overlay">
+              <div class="dist-label">Distance</div>
+              <div class="dist-value" id="dist-value">— km</div>
+              <div class="dist-eta" id="dist-eta">Calculating…</div>
+              <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,140,0,0.12)">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--c-text-3)">Nearest Active Worker</div>
+                <div id="nearest-worker-name" style="font-size:13px;font-weight:700;color:var(--c-text);margin-top:2px">Loading…</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:16px;margin-top:14px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--c-text-2)"><span>🏠</span> Your Location</div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--orange)"><span>👷</span> Available Worker (pulse = active)</div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--c-text-3)"><span style="display:inline-block;width:18px;height:2px;background:var(--orange);border-top:2px dashed var(--orange)"></span> Route estimate</div>
+          </div>
+        </section>
+
+        <!-- My Bookings -->
+        <section id="my-bookings" class="section-card">
+          <div class="ll-section-header">
+            <div class="ll-section-title">📋 My Bookings</div>
+          </div>
+          <div class="bookings-table-wrap">
+            <table class="ll-table">
+              <thead>
+                <tr>
+                  <th>Labour</th><th>Category</th><th>Date</th><th>Slot</th><th>Status</th><th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="booking-history"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Profile + Payments -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:0">
+          <section id="profile" class="section-card" style="margin-bottom:0">
+            <div class="ll-section-title" style="margin-bottom:16px">👤 Profile</div>
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+              <div class="ll-avatar" style="width:52px;height:52px;font-size:20px" id="profile-avatar">C</div>
+              <div>
+                <div style="font-size:16px;font-weight:700;color:var(--c-text)" id="profile-name">User</div>
+                <div style="font-size:12px;color:var(--c-text-2)" id="profile-role">Customer</div>
+              </div>
+            </div>
+            <div style="font-size:13px;color:var(--c-text-2);line-height:1.7">
+              <div>📍 Location: Hyderabad, India</div>
+              <div>📞 Phone: +91 9876 543 210</div>
+              <div>📧 Email: user@labourlo.in</div>
+            </div>
+          </section>
+
+          <section id="payments" class="section-card" style="margin-bottom:0">
+            <div class="ll-section-title" style="margin-bottom:16px">💳 Payments</div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;justify-content:space-between;padding:10px 14px;background:rgba(255,140,0,0.05);border-radius:var(--r-sm);border:1px solid rgba(255,140,0,0.12)">
+                <span style="font-size:13px;color:var(--c-text-2)">Total Spent</span>
+                <span style="font-weight:700;color:var(--c-text)" id="payments-total">₹0</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:10px 14px;background:var(--emerald-light);border-radius:var(--r-sm);border:1px solid rgba(16,185,129,0.2)">
+                <span style="font-size:13px;color:var(--emerald)">Completed</span>
+                <span style="font-weight:700;color:var(--emerald)" id="payments-completed">0</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:10px 14px;background:var(--amber-light);border-radius:var(--r-sm);border:1px solid rgba(245,158,11,0.2)">
+                <span style="font-size:13px;color:var(--amber)">Pending</span>
+                <span style="font-weight:700;color:var(--amber)" id="payments-pending">0</span>
+              </div>
+            </div>
+          </section>
+        </div>
+
+      </div><!-- end ll-content -->
+    </main>
+  </div>
+
+  <!-- Booking Detail Modal -->
+  <div class="ll-modal-overlay" id="detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-name">
+    <div class="ll-modal">
+      <div class="ll-modal-header">
+        <div class="ll-modal-title" id="detail-name">Worker Details</div>
+        <button class="ll-btn ll-btn-ghost ll-btn-icon" id="close-modal" aria-label="Close modal">✕</button>
+      </div>
+      <div class="ll-modal-body">
+        <p style="font-size:14px;color:var(--c-text-2);margin-bottom:6px" id="detail-meta"></p>
+        <p style="font-size:13px;color:var(--c-text-2);margin-bottom:14px" id="detail-strength"></p>
+        <div style="margin-bottom:14px">
+          <div class="ll-label" style="margin-bottom:6px">Reviews</div>
+          <ul id="detail-reviews" style="list-style:none;display:flex;flex-direction:column;gap:6px"></ul>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+          <div class="ll-form-group" style="margin:0">
+            <label class="ll-form-label" for="detail-date">Select Date</label>
+            <input class="ll-input" type="date" id="detail-date">
+          </div>
+          <div class="ll-form-group" style="margin:0">
+            <label class="ll-form-label" for="detail-slot">Select Slot</label>
+            <select class="ll-select" id="detail-slot"></select>
+          </div>
+        </div>
+        <div id="detail-message" style="font-size:13px;font-weight:500;min-height:18px"></div>
+      </div>
+      <div class="ll-modal-footer">
+        <button class="ll-btn ll-btn-ghost" id="close-modal-2">Cancel</button>
+        <button class="ll-btn ll-btn-primary btn-magnetic" id="book-now-btn" style="padding:11px 24px">⚡ Book Now</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Chat Toggle Button -->
+  <button class="ll-chat-toggle" id="chat-toggle-btn" aria-label="Chat with AI Assistant" title="Chat with AI Assistant">
+    <span class="chat-toggle-icon">&#x1F4AC;</span>
+    <span class="chat-unread-dot" id="chat-unread-dot"></span>
+  </button>
+
+  <!-- Chat Widget (hidden by default, opens on click) -->
+  <div class="ll-chat-widget" id="chat-widget" role="complementary" aria-label="Support chat">
+    <div class="ll-chat-header">
+      <div class="ll-chat-avatar">&#x1F916;</div>
+      <div style="flex:1">
+        <div class="ll-chat-title" data-i18n="chat_title">AI Assistant</div>
+        <div class="ll-chat-status" data-i18n="chat_status">Online</div>
+      </div>
+      <button id="chat-close-btn" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--c-text-3);padding:2px 6px;border-radius:6px;line-height:1;transition:color 0.2s" title="Close">&times;</button>
+    </div>
+    <div class="ll-chat-messages" id="chat-box">
+      <div class="ll-chat-msg msg-in">&#x1F916; Hello! I can help you find and book workers. Try asking me!</div>
+    </div>
+    <div class="ll-chat-input-row">
+      <input type="text" id="chat-input" placeholder="Type a message..." aria-label="Chat message">
+      <button class="ll-chat-send" id="chat-send">Send</button>
+    </div>
+  </div>
+
+  <script src="app-state.js"></script>
+  <script src="rbac.js"></script>
+  <script src="user-dashboard.js"></script>
+  <script src="translations.js"></script>
+  <script src="enhancements.js"></script>
+  <script>
+    // Admin return button
+    (function() {
+      var s = window.AppState && window.AppState.getSession();
+      var btn = document.getElementById('admin-return-btn');
+      if (s && (s.isAdmin || s.role === 'admin') && btn) {
+        btn.style.display = 'flex';
+        btn.addEventListener('click', function() {
+          window.AppState.setSession(Object.assign({}, s, { role: 'admin' }));
+          window.location.href = 'admin-panel.html';
+        });
+      }
+    })();
+
+    document.addEventListener('DOMContentLoaded', function() {
+
+      // ── Chat Toggle ──
+      var chatToggle = document.getElementById('chat-toggle-btn');
+      var chatWidget = document.getElementById('chat-widget');
+      var chatClose  = document.getElementById('chat-close-btn');
+      var unreadDot  = document.getElementById('chat-unread-dot');
+      if (unreadDot) unreadDot.style.display = 'block'; // show initial unread indicator
+
+      function openChat() {
+        chatWidget.classList.add('open');
+        chatToggle.classList.add('active');
+        if (unreadDot) unreadDot.style.display = 'none';
+        setTimeout(function(){ var cb = document.getElementById('chat-input'); if(cb) cb.focus(); }, 350);
+      }
+      function closeChat() {
+        chatWidget.classList.remove('open');
+        chatToggle.classList.remove('active');
+      }
+      if (chatToggle) chatToggle.addEventListener('click', function() {
+        chatWidget.classList.contains('open') ? closeChat() : openChat();
+      });
+      if (chatClose) chatClose.addEventListener('click', closeChat);
+
+      // ── Dynamic Stories ──
+      function renderStories() {
+        var showcase = document.getElementById('stories-showcase');
+        if (!showcase) return;
+        var stories = (window.AppState && window.AppState.getStories()) || [];
+        if (!stories.length) {
+          showcase.innerHTML = '<div class="ll-empty" style="grid-column:1/-1;padding:40px"><div class="ll-empty-icon">&#x1F4AA;</div><div class="ll-empty-text">No stories yet</div></div>';
+          return;
+        }
+        showcase.innerHTML = stories.map(function(s) {
+          return '<div class="ll-img-card ll-3d-enter">'
+            + (s.imageUrl ? '<img src="' + s.imageUrl + '" alt="' + s.name + '" onerror="this.style.display=\'none\'">' : '<div style="height:180px;background:var(--orange-light);display:flex;align-items:center;justify-content:center;font-size:48px">&#x1F477;</div>')
+            + '<div class="img-card-info">'
+            + '<div class="img-card-title">' + s.name + ' &mdash; ' + s.role + '</div>'
+            + '<div class="img-card-sub">&ldquo;' + s.storyText + '&rdquo;</div>'
+            + '</div></div>';
+        }).join('');
+      }
+      setTimeout(renderStories, 300);
+
+      // ── authentic.png Scroll Animation (right to left) ──
+      var authImg = document.getElementById('authentic-img');
+      if (authImg) {
+        var authObserver = new IntersectionObserver(function(entries) {
+          entries.forEach(function(entry) {
+            if (entry.isIntersecting) {
+              authImg.style.transform = 'translateX(0)';
+              authObserver.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.25 });
+        authObserver.observe(document.getElementById('authentic-banner') || authImg);
+      }
+
+      // Auto-refresh stories when admin saves a new one (cross-tab localStorage event)
+      window.addEventListener('storage', function(e) {
+        if (e.key === 'labourlo.stories.v1') {
+          renderStories();
+        }
+      });
+
+
+      setTimeout(function() {
+        // Self-booking prevention for labour users
+        var session = window.AppState && window.AppState.getSession();
+        if (session && session.role === 'labour' && !session.isAdmin) {
+          document.querySelectorAll('.btn-book-now, [data-action="book"]').forEach(function(btn) {
+            btn.disabled = true;
+            btn.style.cssText = 'opacity:0.5;cursor:not-allowed;pointer-events:none';
+            btn.textContent = 'Workers Cannot Self-Book';
+          });
+          var fwSection = document.getElementById('find-workers');
+          if (fwSection) {
+            var banner = document.createElement('div');
+            banner.style.cssText = 'padding:14px 18px;background:rgba(255,140,0,0.10);border:1.5px solid rgba(255,140,0,0.30);border-radius:12px;margin-bottom:18px;font-size:13px;color:var(--orange);font-weight:600';
+            banner.innerHTML = '&#x1F528; <strong>Worker View:</strong> Booking is disabled to prevent self-booking. <a href="labour-portal.html" style="color:var(--teal)">Go to your Worker Portal &rarr;</a>';
+            fwSection.insertBefore(banner, fwSection.firstChild);
+          }
+          if (window.LL_toast) window.LL_toast('Workers cannot self-book. Redirected to read-only view.', 'warning', 4000);
+        }
+
+        // Populate nearest worker name on map overlay
+        var workers = window.AppState && window.AppState.getLabours();
+        var available = workers && workers.filter(function(w){ return w.isAvailable; });
+        var el = document.getElementById('nearest-worker-name');
+        if (el && available && available.length) {
+          el.textContent = available[0].name + ' — ' + available[0].category;
+        } else if (el) {
+          el.textContent = 'No workers available';
+        }
+      }, 500);
+    });
+  </script>
+</body>
+</html>
+
